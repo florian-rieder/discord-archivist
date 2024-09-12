@@ -1,0 +1,5 @@
+.DS_Store
+.env
+.venv
+.idea
+__pycache__
