@@ -12,11 +12,25 @@ class Spreadsheet:
     def write(self, cell: str, content: str):
         self._sheet().update_acell(cell, content)
     
+    def purge(self):
+        # delete everything but the first line
+        sheet = self._sheet()
+        rows = sheet.get_all_values()  # Get all data from the sheet
+        if len(rows) > 1:  # If there's more than just the header row
+            sheet.delete_rows(2, len(rows))  # Delete all rows except the first
+
+    
     def get(self, cell: str):
         return self._sh.get(cell)
     
     def append_row(self, row: list):
         self._sheet().append_row(row)
+    
+    def append_rows(self, rows: list):
+        sheet = self._sheet()
+        
+        for row in rows:
+            sheet.append_row(row)
     
     def get_archived_message_ids(self):
         """
