@@ -1,121 +1,133 @@
-from configparser import ConfigParser
+"""
+Based on https://fallendeity.github.io/discord.py-masterclass
+"""
+
+import asyncio
+import configparser
+import datetime
+import logging
 import os
+import time
+import traceback
+import typing
+
 import discord
+from discord.ext import commands
 from dotenv import load_dotenv
 
 from spreadsheet import Spreadsheet
 
-load_dotenv()
-
-TOKEN = os.getenv('DISCORD_TOKEN')
 CONFIG_FILE = 'config.ini'
 
-config = ConfigParser()
+class ArchivistBot(commands.Bot):
+    config: configparser.ConfigParser = configparser.ConfigParser()
+    _uptime: datetime.datetime = datetime.datetime.utcnow()
+    _watcher: asyncio.Task
+    spreadsheet: Spreadsheet # Google Sheet wrapper
 
-intents = discord.Intents.default()
-intents.message_content = True
+    def __init__(self, prefix: str, ext_dir: str, *args: typing.Any, **kwargs: typing.Any) -> None:
+        intents = discord.Intents.default()
+        intents.message_content = True
+        super().__init__(*args, **kwargs,
+                         command_prefix=commands.when_mentioned_or(prefix), intents=intents)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.ext_dir = ext_dir
+        self.synced = False
 
-client = discord.Client(intents=intents)
+    async def _load_extensions(self) -> None:
+        if not os.path.isdir(self.ext_dir):
+            self.logger.error(f"Extension directory {self.ext_dir} does not exist.")
+            return
+        for filename in os.listdir(self.ext_dir):
+            if filename.endswith(".py") and not filename.startswith("_"):
+                try:
+                    await self.load_extension(f"{self.ext_dir}.{filename[:-3]}")
+                    self.logger.info(f"Loaded extension {filename[:-3]}")
+                except commands.ExtensionError:
+                    self.logger.error(f"Failed to load extension {filename[:-3]}\n{traceback.format_exc()}")
+        await self.tree.sync()
 
-spreadsheet = None # Google Spreadsheet instance
+    async def on_error(self, event_method: str, *args: typing.Any, **kwargs: typing.Any) -> None:
+        self.logger.error(f"An error occurred in {event_method}.\n{traceback.format_exc()}")
 
-# Function to extract URLs from message content
+    async def on_ready(self) -> None:
+        self.logger.info(f"Logged in as {self.user} ({self.user.id})")
 
-
-def startup():
-    if os.path.isfile(CONFIG_FILE):
-        config.read(CONFIG_FILE)
-    else:
-        config['DEFAULT']['SPREADSHEET_FILENAME'] = os.getenv('DEFAULT_SPREADSHEET_NAME')
-
-        with open(CONFIG_FILE, 'w') as configfile:
-            config.write(configfile)
-    
-    
-    Spreadsheet(config['DEFAULT']['SPREADSHEET_FILENAME'])
-    
-
-
-def extract_urls(message_content):
-    import re
-    url_regex = r'(https?://\S+)'
-    return re.findall(url_regex, message_content)
-
-
-@client.event
-async def on_ready():
-    print(f'We have logged in as {client.user}')
-
-
-@client.event
-async def on_message(message: discord.Message):
-    global spreadsheet
-    spreadsheet_filename = config['DEFAULT']['SPREADSHEET_FILENAME']
-
-    if message.author == client.user:
-        return
-
-    if message.content.startswith('$archive purge'):
-        spreadsheet.purge()
-        await message.channel.send(f'Spreadsheet "{spreadsheet_filename}" purged !')
-        return
-
-    # Command to archive old messages in the channel
-    if message.content.startswith('$archive channel'):
-        await archive_messages(message.channel)
-        await message.channel.send(f'Messages from the #{message.channel.name} channel archived to "{spreadsheet_filename}" !')
-        return
-
-    if message.content.startswith('$archive config spreadsheet'):
-        parts = message.content.split('$archive config spreadsheet ')
-        spreadsheet_filename = parts[1]
-        spreadsheet = Spreadsheet(spreadsheet_filename)  # Google Spreadsheet instance
+    async def setup_hook(self) -> None:
+        # Load config
+        if os.path.isfile(CONFIG_FILE):
+            # Read config
+            self.config.read(CONFIG_FILE)
+        else:
+            # Write default config
+            self.config['DEFAULT']['SPREADSHEET_FILENAME'] = os.getenv(
+                'DEFAULT_SPREADSHEET_NAME')
+            self.save_config()
         
-        config['DEFAULT']['SPREADSHEET_FILENAME'] = spreadsheet_filename
+        # Load cogs
+        await self._load_extensions()
 
+        # Load spreadsheet
+        self.spreadsheet = Spreadsheet(
+            self.config['DEFAULT']['SPREADSHEET_FILENAME'])
+
+        # Initialize cog watcher
+        self._watcher = self.loop.create_task(self._cog_watcher())
+        
+        # Sync with discord
+        if not self.synced:
+            await self.tree.sync()
+            self.synced = not self.synced
+            self.logger.info("Synced command tree")
+
+    def save_config(self):
         with open(CONFIG_FILE, 'w') as configfile:
-            config.write(configfile)
+            self.config.write(configfile)
 
-        await message.channel.send(f'Spreadsheet changed to "{spreadsheet_filename}" !')
-        return
+    async def close(self) -> None:
+        await super().close()
+    
+    async def _cog_watcher(self):
+        print("Watching for changes...")
+        last = time.time()
+        while True:
+            extensions: set[str] = set()
+            for name, module in self.extensions.items():
+                if module.__file__ and os.stat(module.__file__).st_mtime > last:
+                    extensions.add(name)
+            for ext in extensions:
+                try:
+                    await self.reload_extension(ext)
+                    print(f"Reloaded {ext}")
+                except commands.ExtensionError as e:
+                    print(f"Failed to reload {ext}: {e}")
+            last = time.time()
+            await asyncio.sleep(1)
+
+    def run(self, *args: typing.Any, **kwargs: typing.Any) -> None:
+        load_dotenv()
+        try:
+            super().run(str(os.getenv("DISCORD_TOKEN")), *args, **kwargs)
+        except (discord.LoginFailure, KeyboardInterrupt):
+            self.logger.info("Exiting...")
+            exit()
+
+    @property
+    def user(self) -> discord.ClientUser:
+        assert super().user, "Bot is not ready yet"
+        return typing.cast(discord.ClientUser, super().user)
+
+    @property
+    def uptime(self) -> datetime.timedelta:
+        return datetime.datetime.utcnow() - self._uptime
 
 
-# Function to archive old messages in the given channel, starting from the oldest
-async def archive_messages(channel):
-    archived_ids = spreadsheet.get_archived_message_ids()  # Get archived message IDs
+def main() -> None:
+    logging.basicConfig(level=logging.INFO,
+                        format="[%(asctime)s] %(levelname)s: %(message)s")
+    bot = ArchivistBot(prefix="!", ext_dir="cogs")
+    bot.run()
 
-    # Retrieve messages starting from the oldest, with the oldest_first=True parameter
-    async for message in channel.history(limit=200, oldest_first=True):
-        # Skip messages from the bot itself and already archived messages
-        if message.author == client.user or str(message.id) in archived_ids:
-            continue
 
-        # Extract URLs from the message
-        urls = extract_urls(message.content)
-
-        if not urls:
-            continue
-
-        entries = []
-
-        for url in urls:
-            # Format the timestamp and message content for archiving
-            timestamp = message.created_at.strftime(
-                '%Y-%m-%d %H:%M:%S')  # Format the timestamp
-            message_content = message.content  # Store the entire message content
-
-            # Append the message ID, author, timestamp, URL, and message content to the Google Sheet
-            entry = [str(message.id), message.author.name,
-                     timestamp, url, message_content]
-
-            entries.append(entry)
-
-            print(f"Archived URL: {url} from message: {
-                  message_content} at {timestamp}")
-
-        # Batch write to the Google spreadsheet
-        spreadsheet.append_rows(entries)
-
-if __name__ == '__main__':
-    startup()
-    client.run(TOKEN)
+if __name__ == "__main__":
+    main()
