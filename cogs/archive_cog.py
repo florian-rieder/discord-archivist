@@ -3,6 +3,7 @@ from discord.ext import commands
 
 from spreadsheet import Spreadsheet
 from utils import extract_urls
+from entry import MessageEntry
 
 
 class ArchiveCog(commands.Cog):
@@ -24,7 +25,7 @@ class ArchiveCog(commands.Cog):
         if key == 'help':
             await ctx.send('Available settings:\n'
                            "`spreadsheet`: the name of the spreadsheet to use (the spreadsheet must have been shared with this bot's service account)"
-                           '`limit`: the limit of how many messages the bot can retrieve per channel (default=200)')
+                           '`limit`: the limit of how many messages the bot can retrieve per channel (max=100)')
             return
         
         if key == 'spreadsheet':
@@ -46,7 +47,7 @@ class ArchiveCog(commands.Cog):
     async def archive_channel(self, ctx: commands.Context[commands.Bot]) -> None:
         """Archive all URLs in the current channel"""
         await self.archive_messages(ctx.channel)
-        await ctx.channel.send(f'Messages from the #{ctx.channel.name} channel archived to "{self.bot.config['SPREADSHEET_FILENAME']}" !')
+        await ctx.channel.send(f'Messages from the #{ctx.channel.name} channel archived to "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" !')
         return
     
     @archive.command(name="all")
@@ -60,40 +61,60 @@ class ArchiveCog(commands.Cog):
 
 
     # Function to archive old messages in the given channel, starting from the oldest
+    # Function to archive old messages in the given channel, starting from the oldest
     async def archive_messages(self, channel):
         archived_ids = self.bot.spreadsheet.get_archived_message_ids()  # Get archived message IDs
         limit = int(self.bot.config['DEFAULT']['MESSAGES_LIMIT'])
+        last_message = None  # This will store the ID of the last message processed
 
-        # Retrieve messages starting from the oldest
-        async for message in channel.history(limit=limit, oldest_first=True):
-            # Skip messages from the bot itself and already archived messages
-            if message.author == self.bot.user or str(message.id) in archived_ids:
-                continue
+        while True:
+            # Retrieve messages in batches of up to limit, starting from the oldest
+            messages = [message async for message in channel.history(limit=limit, after=last_message, oldest_first=True)]
 
-            # Extract URLs from the message
-            urls = extract_urls(message.content)
-
-            # Skip messages which do not contain an URL
-            if not urls:
-                continue
+            # If no more messages are returned, break the loop
+            if not messages:
+                break
 
             entries = []
 
-            for url in urls:
-                # Format the timestamp and message content for archiving
-                timestamp = message.created_at.strftime(
-                    '%Y-%m-%d %H:%M:%S')  # Format the timestamp
-                message_content = message.content  # Store the entire message content
+            for message in messages:
+                # Skip messages from the bot itself and already archived messages
+                if message.author == self.bot.user or str(message.id) in archived_ids:
+                    continue
 
-                # Append the message ID, channel, author, timestamp, URL, and message content to the Google Sheet
-                entry = [str(message.id), message.channel.name, message.author.name, timestamp, url, message_content]
+                # Extract URLs from the message
+                urls = extract_urls(message.content)
 
-                entries.append(entry)
+                # Skip messages which do not contain an URL
+                if not urls:
+                    continue
 
-                print(f"Archived URL: {url} from message: {message_content} at {timestamp}")
+                for url in urls:
+                    # Format the timestamp and message content for archiving
+                    timestamp = message.created_at.strftime('%Y-%m-%d %H:%M:%S')  # Format the timestamp
+                    message_content = message.content  # Store the entire message content
+
+                    # Append the message ID, channel, author, timestamp, URL, and message content to the Google Sheet
+                    entry = MessageEntry(
+                        message_id=str(message.id),
+                        channel_name=message.channel.name,
+                        author_name=message.author.name,
+                        timestamp=timestamp,
+                        url=url,
+                        message_content=message_content,
+                        jump_url=message.jump_url
+                    )
+
+                    entries.append(entry)
+
+                    print(f"Archived URL: {url} from message: {message_content} at {timestamp}")
 
             # Batch write to the Google spreadsheet
-            self.bot.spreadsheet.append_rows(entries)
+            if entries:
+                self.bot.spreadsheet.append_rows(entries)
+
+            # Update the last_message_id to the ID of the last message in the current batch
+            last_message = messages[-1]
 
 
 async def setup(bot: commands.Bot):

@@ -61,7 +61,7 @@ class ArchivistBot(commands.Bot):
         else:
             # If there is no config file, write default config
             self.config['DEFAULT']['SPREADSHEET_FILENAME'] = os.getenv('DEFAULT_SPREADSHEET_NAME', 'default')
-            self.config['DEFAULT']['MESSAGES_LIMIT'] = 200
+            self.config['DEFAULT']['MESSAGES_LIMIT'] = 100
             self.save_config()
         
         # Load cogs
