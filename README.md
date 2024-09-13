@@ -8,7 +8,7 @@ This is a discord bot meant to archive links from a Discord server.
 ```.env
 DISCORD_TOKEN=YOUR TOKEN HERE
 ```
-3. Get a [Google service account](https://docs.gspread.org/en/latest/oauth2.html)
+3. Get a [Google service account](https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account) (steps 1-7)
 4. Share your Google Sheet with the Google service account email.
 5. Create virtual environment and install dependencies with the `make install` command
 6. Launch the bot with the `make up` command

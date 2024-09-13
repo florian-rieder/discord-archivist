@@ -1,3 +1,5 @@
+import traceback
+
 import discord
 from discord.ext import commands
 
@@ -28,34 +30,51 @@ class ArchiveCog(commands.Cog):
                            '`limit`: the limit of how many messages the bot can retrieve per channel (max=100)')
             return
         
-        if key == 'spreadsheet':
-            self.bot.config['DEFAULT']['SPREADSHEET_FILENAME'] = value
-            self.bot.spreadsheet = Spreadsheet(value)
-        if key == 'limit':
-            self.bot.config['DEFAULT']['MESSAGES_LIMIT'] = value
-        self.bot.save_config()
+        try:
+            if key == 'spreadsheet':
+                self.bot.config['DEFAULT']['SPREADSHEET_FILENAME'] = value
+                self.bot.spreadsheet = Spreadsheet(value)
+            if key == 'limit':
+                self.bot.config['DEFAULT']['MESSAGES_LIMIT'] = value
+            self.bot.save_config()
 
-        await ctx.send(f'Setting {key} set to {value}')
-    
+            await ctx.send(f'Setting {key} set to {value}')
+        except Exception as e:
+            self.bot.logger.error('An error occurred: ', exc_info=True)
+            await ctx.send(f'An error occurred: {traceback.format_exc()}')
+
     @archive.command(name="purge")
     async def archive_purge(self, ctx: commands.Context[commands.Bot]) -> None:
         """Delete all data from the spreadsheet"""
-        self.bot.spreadsheet.purge()
-        await ctx.channel.send(f'Spreadsheet "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" purged !')
+        try:
+            self.bot.spreadsheet.purge()
+            await ctx.channel.send(f'Spreadsheet "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" purged !')
+        except Exception as e:
+            self.bot.logger.error('An error occurred: ', exc_info=True)
+            await ctx.send(f'An error occurred: {traceback.format_exc()}')
 
     @archive.command(name="channel")
     async def archive_channel(self, ctx: commands.Context[commands.Bot]) -> None:
         """Archive all URLs in the current channel"""
-        await self.archive_messages(ctx.channel)
-        await ctx.channel.send(f'Messages from the #{ctx.channel.name} channel archived to "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" !')
+        
+        try:
+            await self.archive_messages(ctx.channel)
+            await ctx.channel.send(f'Messages from the #{ctx.channel.name} channel archived to "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" !')
+        except Exception as e:
+            self.bot.logger.error('An error occurred: ', exc_info=True)
+            await ctx.send(f'An error occurred: {traceback.format_exc()}')
         return
     
     @archive.command(name="all")
     async def archive_all(self, ctx: commands.Context[commands.Bot]) -> None:
         """Archive all URLs in all text channels"""
         for channel in ctx.guild.text_channels:
-            await self.archive_messages(channel)
-            await ctx.send(f'Archived all messages from #{channel.name} to the spreadsheet!')
+            try:
+                await self.archive_messages(channel)
+                await ctx.send(f'Archived all messages from #{channel.name} to the spreadsheet!')
+            except Exception as e:
+                self.bot.logger.error('An error occurred: ', exc_info=True)
+                await ctx.send(f'An error occurred: {traceback.format_exc()}')
 
         await ctx.send(f"All channels have been archived to '{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}'!")
 

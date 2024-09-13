@@ -23,7 +23,7 @@ class ArchivistBot(commands.Bot):
     config: configparser.ConfigParser = configparser.ConfigParser()
     _uptime: datetime.datetime = datetime.datetime.now()
     _watcher: asyncio.Task
-    spreadsheet: Spreadsheet # Google Sheet wrapper
+    spreadsheet: Spreadsheet # Google Sheet gspread wrapper
 
     def __init__(self, prefix: str, ext_dir: str, *args: typing.Any, **kwargs: typing.Any) -> None:
         intents = discord.Intents.default()
@@ -61,9 +61,9 @@ class ArchivistBot(commands.Bot):
         else:
             # If there is no config file, write default config
             self.config['DEFAULT']['SPREADSHEET_FILENAME'] = os.getenv('DEFAULT_SPREADSHEET_NAME', 'default')
-            self.config['DEFAULT']['MESSAGES_LIMIT'] = 100
+            self.config['DEFAULT']['MESSAGES_LIMIT'] = '100'
             self.save_config()
-        
+
         # Load cogs
         await self._load_extensions()
 
@@ -72,7 +72,7 @@ class ArchivistBot(commands.Bot):
 
         # Initialize cog watcher
         self._watcher = self.loop.create_task(self._cog_watcher())
-        
+
         # Sync with discord
         if not self.synced:
             await self.tree.sync()
@@ -85,7 +85,7 @@ class ArchivistBot(commands.Bot):
 
     async def close(self) -> None:
         await super().close()
-    
+
     async def _cog_watcher(self):
         print("Watching for changes...")
         last = time.time()
