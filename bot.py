@@ -21,7 +21,7 @@ CONFIG_FILE = 'config.ini'
 
 class ArchivistBot(commands.Bot):
     config: configparser.ConfigParser = configparser.ConfigParser()
-    _uptime: datetime.datetime = datetime.datetime.utcnow()
+    _uptime: datetime.datetime = datetime.datetime.now()
     _watcher: asyncio.Task
     spreadsheet: Spreadsheet # Google Sheet wrapper
 
@@ -59,17 +59,16 @@ class ArchivistBot(commands.Bot):
             # Read config
             self.config.read(CONFIG_FILE)
         else:
-            # Write default config
-            self.config['DEFAULT']['SPREADSHEET_FILENAME'] = os.getenv(
-                'DEFAULT_SPREADSHEET_NAME')
+            # If there is no config file, write default config
+            self.config['DEFAULT']['SPREADSHEET_FILENAME'] = os.getenv('DEFAULT_SPREADSHEET_NAME', 'default')
+            self.config['DEFAULT']['MESSAGES_LIMIT'] = 200
             self.save_config()
         
         # Load cogs
         await self._load_extensions()
 
         # Load spreadsheet
-        self.spreadsheet = Spreadsheet(
-            self.config['DEFAULT']['SPREADSHEET_FILENAME'])
+        self.spreadsheet = Spreadsheet(self.config['DEFAULT']['SPREADSHEET_FILENAME'])
 
         # Initialize cog watcher
         self._watcher = self.loop.create_task(self._cog_watcher())
@@ -119,7 +118,7 @@ class ArchivistBot(commands.Bot):
 
     @property
     def uptime(self) -> datetime.timedelta:
-        return datetime.datetime.utcnow() - self._uptime
+        return datetime.datetime.now() - self._uptime
 
 
 def main() -> None:
