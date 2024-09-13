@@ -15,7 +15,7 @@ class ArchiveCog(commands.Cog):
     @commands.hybrid_group(name="archive")
     async def archive(self, ctx: commands.Context[commands.Bot]) -> None:
         """Archive commands group"""
-        await ctx.send('Available commands:\n'
+        await ctx.reply('Available commands:\n'
                        '`/archive config`: configure the archivist\n'
                        '`/archive purge`: empty the current spreadsheet\n'
                        '`/archive channel`: archive links in the current channel\n'
@@ -25,7 +25,7 @@ class ArchiveCog(commands.Cog):
     async def archive_config(self, ctx: commands.Context[commands.Bot], key, value) -> None:
         """Configure the archivist"""
         if key == 'help':
-            await ctx.send('Available settings:\n'
+            await ctx.reply('Available settings:\n'
                            "`spreadsheet`: the name of the spreadsheet to use (the spreadsheet must have been shared with this bot's service account)"
                            '`limit`: the limit of how many messages the bot can retrieve per channel (max=100)')
             return
@@ -38,45 +38,47 @@ class ArchiveCog(commands.Cog):
                 self.bot.config['DEFAULT']['MESSAGES_LIMIT'] = value
             self.bot.save_config()
 
-            await ctx.send(f'Setting {key} set to {value}')
+            await ctx.reply(f'Setting {key} set to {value}')
         except Exception as e:
             self.bot.logger.error('An error occurred: ', exc_info=True)
-            await ctx.send(f'An error occurred: {traceback.format_exc()}')
+            await ctx.reply(f'An error occurred: {traceback.format_exc()}')
 
     @archive.command(name="purge")
     async def archive_purge(self, ctx: commands.Context[commands.Bot]) -> None:
         """Delete all data from the spreadsheet"""
+        await ctx.defer()  # Acknowledge the command to prevent timeout
         try:
             self.bot.spreadsheet.purge()
-            await ctx.channel.send(f'Spreadsheet "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" purged !')
+            await ctx.reply(f'Spreadsheet "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" purged !')
         except Exception as e:
             self.bot.logger.error('An error occurred: ', exc_info=True)
-            await ctx.send(f'An error occurred: {traceback.format_exc()}')
+            await ctx.reply(f'An error occurred: {traceback.format_exc()}')
 
     @archive.command(name="channel")
     async def archive_channel(self, ctx: commands.Context[commands.Bot]) -> None:
         """Archive all URLs in the current channel"""
-        
+        await ctx.defer()  # Acknowledge the command to prevent timeout
         try:
             await self.archive_messages(ctx.channel)
-            await ctx.channel.send(f'Messages from the #{ctx.channel.name} channel archived to "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" !')
+            await ctx.reply(f'Messages from the #{ctx.channel.name} channel archived to "{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}" !')
         except Exception as e:
             self.bot.logger.error('An error occurred: ', exc_info=True)
-            await ctx.send(f'An error occurred: {traceback.format_exc()}')
-        return
+            await ctx.reply(f'An error occurred: {traceback.format_exc()}')
     
     @archive.command(name="all")
     async def archive_all(self, ctx: commands.Context[commands.Bot]) -> None:
         """Archive all URLs in all text channels"""
+        await ctx.defer()  # Acknowledge the command to prevent timeout
         for channel in ctx.guild.text_channels:
             try:
                 await self.archive_messages(channel)
                 await ctx.send(f'Archived all messages from #{channel.name} to the spreadsheet!')
             except Exception as e:
                 self.bot.logger.error('An error occurred: ', exc_info=True)
-                await ctx.send(f'An error occurred: {traceback.format_exc()}')
+                await ctx.reply(f'An error occurred: {traceback.format_exc()}')
+                return
 
-        await ctx.send(f"All channels have been archived to '{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}'!")
+        await ctx.reply(f"All channels have been archived to '{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}'!")
 
 
     # Function to archive old messages in the given channel, starting from the oldest
@@ -126,7 +128,7 @@ class ArchiveCog(commands.Cog):
 
                     entries.append(entry)
 
-                    print(f"Archived URL: {url} from message: {message_content} at {timestamp}")
+                    self.bot.logger.debug(f"Archived URL: {url} from message: {message_content} at {timestamp}")
 
             # Batch write to the Google spreadsheet
             if entries:

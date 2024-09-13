@@ -9,7 +9,12 @@ class TestCog(commands.Cog):
     @commands.hybrid_command(name="ping")
     async def ping(self, ctx: commands.Context[commands.Bot]) -> None:
         """Pong!"""
-        await ctx.send("Pong!")
+        await ctx.reply("Pong!")
+    
+    @commands.hybrid_command(name="uptime")
+    async def uptime(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Pong!"""
+        await ctx.reply(self.bot.uptime)
 
     @commands.hybrid_command(name="echo")
     async def echo(self, ctx: commands.Context[commands.Bot], message: str):
@@ -23,7 +28,7 @@ class TestCog(commands.Cog):
         message: str
             The message to echo
         """
-        await ctx.send(message)
+        await ctx.reply(message)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(TestCog(bot))
