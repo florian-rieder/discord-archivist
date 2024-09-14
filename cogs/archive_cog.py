@@ -11,7 +11,7 @@ from entry import MessageEntry
 class ArchiveCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-    
+
     @commands.hybrid_group(name="archive")
     async def archive(self, ctx: commands.Context[commands.Bot]) -> None:
         """Archive commands group"""
@@ -78,10 +78,9 @@ class ArchiveCog(commands.Cog):
                 await ctx.reply(f'An error occurred: {traceback.format_exc()}')
                 return
 
-        await ctx.reply(f"All channels have been archived to '{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}'!")
+        await ctx.reply(f"All channels have been archived to '{self.bot.config['DEFAULT']['SPREADSHEET_FILENAME']}'! ✅")
 
 
-    # Function to archive old messages in the given channel, starting from the oldest
     # Function to archive old messages in the given channel, starting from the oldest
     async def archive_messages(self, channel):
         archived_ids = self.bot.spreadsheet.get_archived_message_ids()  # Get archived message IDs
@@ -134,7 +133,7 @@ class ArchiveCog(commands.Cog):
             if entries:
                 self.bot.spreadsheet.append_rows(entries)
 
-            # Update the last_message_id to the ID of the last message in the current batch
+            # Update the last_message to the last message in the current batch
             last_message = messages[-1]
 
 

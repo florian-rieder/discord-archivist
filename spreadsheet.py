@@ -1,6 +1,11 @@
+from datetime import datetime
+import logging
+
 import gspread
 
 from entry import MessageEntry
+
+logger = logging.getLogger(__name__)
 
 
 class Spreadsheet:
@@ -8,58 +13,77 @@ class Spreadsheet:
         self._gc = gspread.service_account()
         self.filename = filename
 
+    @property
+    def spreadsheet(self):
+        # Open the spreadsheet connection. If we only do this once
+        return self._gc.open(self.filename)
 
-    def _sheet(self):
-        return self._gc.open(self.filename).sheet1
+    def update_time(self):
+        """
+        Updates the "Last update" field in the spreadsheet
+        """
+        try:
+            sheet2 = self.spreadsheet.get_worksheet(1)
+        except gspread.exceptions.WorksheetNotFound:
+            sheet2 = self.spreadsheet.add_worksheet('Meta', None, None)
+        
+        sheet2.update_acell('A1', 'Last update')
+        sheet2.update_acell('B1', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     def create_headers(self):
         """
         Create the headers for the spreadsheet.
         """
-        headers = ["Message ID", "Channel", "Author", "Timestamp", "URL", "Message Content", "Jump URL"]
-        self._sheet().insert_row(headers, 1)
+        headers = ["Message ID", "Channel", "Author",
+                   "Timestamp", "URL", "Message Content", "Jump URL"]
+        self.spreadsheet.sheet1.insert_row(headers, 1)
 
     def write(self, cell: str, content: str):
-        self._sheet().update_acell(cell, content)
+        self.spreadsheet.sheet1.update_acell(cell, content)
 
     def purge(self):
         """
         Delete all rows in the spreadsheet and regenerate the header row.
         """
         # Clear all rows
-        self._sheet().clear()
+        self.spreadsheet.sheet1.clear()
         # Regenerate headers
         self.create_headers()
+        self.update_time()
+        logger.info(f'Spreadsheet {self.filename} purged !')
 
     def get(self, cell: str):
-        return self._sheet().get(cell)
+        return self.spreadsheet.sheet1.get(cell)
 
     def append_row(self, entry: MessageEntry):
         """
         Append a single row representing the message entry.
-        The channel name will be a clickable link (HYPERLINK function).
         """
 
         # Convert the dataclass instance into a list
         row = entry.to_row()
-        self._sheet().append_row(row)
-    
+        self.spreadsheet.sheet1.append_row(row)
+        self.update_time()
+        logger.info(f'Appended row to spreadsheet {self.filename}!')
+
     def append_rows(self, entries: list[MessageEntry]):
         """
         Append multiple rows representing message entries.
-        Each channel name will be a clickable link (HYPERLINK function).
         """
         rows = [e.to_row() for e in entries]
 
-        self._sheet().append_rows(rows)
+        self.spreadsheet.sheet1.append_rows(rows)
+        self.update_time()
+        logger.info(f'Appended rows to spreadsheet {self.filename}!')
 
     def get_archived_message_ids(self):
         """
         Retrieve all the archived message IDs from the spreadsheet.
         We assume that message IDs are stored in the first column.
         """
-        message_ids = self._sheet().col_values(1)  # Assume message IDs are in the first column
+        message_ids = self.spreadsheet.sheet1.col_values(1)
         return set(message_ids)  # Return as a set for fast lookup
+
 
 if __name__ == '__main__':
     entry = MessageEntry(
@@ -73,4 +97,5 @@ if __name__ == '__main__':
     )
 
     sh = Spreadsheet('Test archiviste')
+    #sh.purge()
     sh.append_row(entry)

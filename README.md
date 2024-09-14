@@ -1,5 +1,5 @@
 # Discord archivist
-This is a discord bot meant to archive links from a Discord server.
+This is a discord bot meant to archive links from a Discord server to a Google Sheet.
 
 ## Installation
 
@@ -23,13 +23,13 @@ make up
 
 ## Commands
 
-`/archive purge`
+`/archive purge`: DANGER: clears the spreadsheet
 
-`/archive config`
+`/archive config`: Configure the bot
 
-`/archive all`
+`/archive all`: Archive links in all channels
 
-`/archive channel`
+`/archive channel`: Archive links in the current channel
 
 
 # Requirements
