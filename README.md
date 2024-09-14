@@ -4,7 +4,7 @@ This is a discord bot meant to archive links from a Discord server.
 ## Installation
 
 1. Get a [Discord bot account](https://discordpy.readthedocs.io/en/stable/discord.html#creating-a-bot-account)
-2. Add your discord bot token to your `.env` file.
+2. Create a `.env` file and add your discord bot token to it
 ```.env
 DISCORD_TOKEN=YOUR TOKEN HERE
 ```
@@ -30,3 +30,9 @@ make up
 `/archive all`
 
 `/archive channel`
+
+
+# Requirements
+- Python 3
+- discordpy
+- gspread
