@@ -15,7 +15,7 @@ class Spreadsheet:
 
     @property
     def spreadsheet(self):
-        # Open the spreadsheet connection. If we only do this once
+        # Open the spreadsheet connection. If we only do this once, the connection can drop.
         return self._gc.open(self.filename)
 
     def update_time(self):
