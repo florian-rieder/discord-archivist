@@ -30,6 +30,12 @@ class TestCog(commands.Cog):
         """
         await ctx.reply(message)
 
+    @commands.hybrid_command(name="kill")
+    async def kill(self, ctx: commands.Context[commands.Bot]):
+        await ctx.reply("Shutting down... Beep boop 👍🏿")
+        await ctx.bot.close()
+        exit()
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(TestCog(bot))
 
