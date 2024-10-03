@@ -20,13 +20,14 @@ class Spreadsheet:
 
     def update_time(self):
         """
-        Updates the "Last update" field in the spreadsheet
+        Updates the "Last update" field in the spreadsheet. Represents the time
+        of the last archival.
         """
         try:
             sheet2 = self.spreadsheet.get_worksheet(1)
         except gspread.exceptions.WorksheetNotFound:
             sheet2 = self.spreadsheet.add_worksheet('Meta', None, None)
-        
+
         sheet2.update_acell('A1', 'Last update')
         sheet2.update_acell('B1', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
@@ -49,11 +50,15 @@ class Spreadsheet:
         self.spreadsheet.sheet1.clear()
         # Regenerate headers
         self.create_headers()
-        self.update_time()
         logger.info(f'Spreadsheet {self.filename} purged !')
 
-    def get(self, cell: str):
-        return self.spreadsheet.sheet1.get(cell)
+    def get(self, cell: str, sheet_index: int = 0):
+        try:
+            sheet = self.spreadsheet.get_worksheet(sheet_index)
+        except gspread.exceptions.WorksheetNotFound:
+            return None
+
+        return sheet.get(cell)
 
     def append_row(self, entry: MessageEntry):
         """
@@ -97,5 +102,5 @@ if __name__ == '__main__':
     )
 
     sh = Spreadsheet('Test archiviste')
-    #sh.purge()
+    # sh.purge()
     sh.append_row(entry)

@@ -86,6 +86,8 @@ class ArchiveCog(commands.Cog):
         archived_ids = self.bot.spreadsheet.get_archived_message_ids()  # Get archived message IDs
         limit = int(self.bot.config['DEFAULT']['MESSAGES_LIMIT'])
         last_message = None  # This will store the ID of the last message processed
+        
+        last_archive_time = self.bot.spreadsheet.get('B2', sheet_index=1)
 
         while True:
             # Retrieve messages in batches of up to limit, starting from the oldest
